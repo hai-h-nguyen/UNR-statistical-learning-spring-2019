@@ -1,0 +1,18 @@
+function [score] = evaluate_split(left, right, chosen_feature)
+    score = 0;
+    
+    
+    mean_right = mean(right);
+    
+    
+    t_left = left - mean(left);
+    t_right = right - mean(right);
+    
+    t_left = t_left.^2;
+    score = score + sum(t_left, 2);
+    
+    t_right = t_right.^2;
+    score = score + sum(t_score, 2);
+
+end
+
