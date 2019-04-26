@@ -1,5 +1,8 @@
-clc;
 clear all;
+close all;
+clc;
+
+%% Load the auto data
 data = readtable("Hitters.csv");
 
 first_row = 0;
@@ -33,31 +36,70 @@ half = ceil(total_sample / 2);
 train_data = new_data(1:half, :);
 test_data = new_data(half + 1 : end, :);
 
-% Create a full tree
-num_features = size(train_data, 2) - 1;
+X = train_data(:, 1:end-1);
+Y = train_data(:, end);
 
-score_list = [];
+cols = {'Hits', 'Runs', 'RBI', 'Walks', 'Years','PutOuts'};
 
-for i = 1:num_features
-   % Calculate the mean of the features
-   mean_feature = mean(train_data(:, i));
-   
-   % Pick this feature and perform the splitting around the mean value
-   [left, right] = split_data(train_data, i);
+%% Build the decision tree
+t = build_tree(X,Y,cols);
+
+%% Display the tree
+treeplot(t.p');
+title('Decision tree');
+[xs,ys,h,s] = treelayout(t.p');
+
+for i = 2:numel(t.p)
+  % Get my coordinate
+  my_x = xs(i);
+  my_y = ys(i);
+
+  % Get parent coordinate
+  parent_x = xs(t.p(i));
+  parent_y = ys(t.p(i));
+
+  % Calculate weight coordinate (midpoint)
+  mid_x = (my_x + parent_x)/2;
+  mid_y = (my_y + parent_y)/2;
+
+    % Edge label
+  text(mid_x,mid_y,t.labels{i-1});
     
-   % Evaluate this split
-   score = evaluate_split(left, right);
-    
-   score_list(i) = score;
+    % Leaf label
+    if ~isempty(t.inds{i})
+        val = Y(t.inds{i});
+        text(my_x, my_y, sprintf('y=%2.2f\nn=%d', mean(val), numel(val)));
+    end
 end
 
-% Pick the minimum from score_list and perform the split
-[~, chosen_feature] = min(score_list);
+%% Prediction
+predicted_Y = zeros(size(test_data,1), 1);
 
-[left, right] = split_data(train_data, chosen_feature);
-
-% Perform this routine recursively on the left and right tree
-
-% TODO: Save the tree structure to plot
-
-% TODO: Stop condition
+%% calculate mean value for each leaf
+for j = 1 : size(t.inds,1)
+    idx_arr = cell2mat(t.inds(j));
+    if (~isempty(idx_arr))
+        t.mean_predict(j) = mean(Y(idx_arr));
+    else
+        t.mean_predict(j) = 0;
+    end
+end
+ 
+for i = 1 : size(test_data,1)    
+    % predict from input
+    X_test = test_data(i, 1:end-1);
+    node = 1;
+    
+    % Go down the tree
+    while ((t.left_child(node) > 0) && (t.right_child(node) > 0)) % not a leaf
+        if (X_test(t.feature(node)) < t.key(node))
+            node = t.left_child(node);
+        else
+            node = t.right_child(node);
+        end
+    end
+    
+    predicted_Y(i) = t.mean_predict(node);       
+end
+MSE_test = sqrt(sum((predicted_Y - test_data(i, end)).^2) / size(test_data,1));
+fprintf('Test MSE %f', MSE_test);
